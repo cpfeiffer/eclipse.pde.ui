@@ -96,10 +96,8 @@ public class FindClassResolutionsOperation implements IRunnableWithProgress {
 		}
 
 		Set packagesToExport = new HashSet();
-		List validPackages = getValidPackages(typeName, packageName, packagesToExport, monitor);
+		Collection validPackages = getValidPackages(typeName, packageName, packagesToExport, monitor);
 		if (validPackages != null) {
-			Iterator validPackagesIter = validPackages.iterator();
-			Set visiblePkgs = null;
 
 			if (validPackages.isEmpty()) {
 				for (Iterator it = packagesToExport.iterator(); it.hasNext();) {
@@ -109,6 +107,8 @@ public class FindClassResolutionsOperation implements IRunnableWithProgress {
 				return;
 			}
 
+			Iterator validPackagesIter = validPackages.iterator();
+			Set visiblePkgs = null;
 			boolean allowMultipleFixes = packageName == null;
 			while (validPackagesIter.hasNext() && (allowMultipleFixes || !fCollector.isDone())) {
 				// since getting visible packages is not very efficient, only do it once and cache result
@@ -126,10 +126,10 @@ public class FindClassResolutionsOperation implements IRunnableWithProgress {
 		}
 	}
 
-	private List getValidPackages(String typeName, String packageName, Set packagesToExport, IProgressMonitor monitor) {
+	private Collection getValidPackages(String typeName, String packageName, Set packagesToExport, IProgressMonitor monitor) {
 		SubMonitor subMonitor = SubMonitor.convert(monitor, 3);
 
-		List validPackages = null;
+		Collection validPackages = null;
 		ImportPackageSpecification[] importPkgs = null;
 		IPluginModelBase model = PluginRegistry.findModel(fProject.getProject());
 		if (model != null && model.getBundleDescription() != null) {
@@ -140,12 +140,12 @@ public class FindClassResolutionsOperation implements IRunnableWithProgress {
 		if (importPkgs != null) {
 			if (packageName != null) {
 				if (!isImportedPackage(packageName, importPkgs)) {
-					validPackages = new ArrayList(getValidPackages(packageName));
+					validPackages = getValidPackages(packageName);
 				}
 				subMonitor.worked(1);
 			} else {
 				// find possible types in the global packages
-				validPackages = new ArrayList(findValidPackagesContainingSimpleType(typeName, importPkgs, packagesToExport, subMonitor.newChild(1)));
+				validPackages = findValidPackagesContainingSimpleType(typeName, importPkgs, packagesToExport, subMonitor.newChild(1));
 			}
 		}
 		return validPackages;
@@ -165,7 +165,7 @@ public class FindClassResolutionsOperation implements IRunnableWithProgress {
 	 * @param monitor
 	 * @return the set of packages to import
 	 */
-	private Set findValidPackagesContainingSimpleType(String aTypeName, ImportPackageSpecification[] importPkgs, Set packagesToExport, IProgressMonitor monitor) {
+	private Collection findValidPackagesContainingSimpleType(String aTypeName, ImportPackageSpecification[] importPkgs, Set packagesToExport, IProgressMonitor monitor) {
 		SubMonitor subMonitor = SubMonitor.convert(monitor);
 
 		IPluginModelBase[] activeModels = PluginRegistry.getActiveModels();
@@ -204,7 +204,7 @@ public class FindClassResolutionsOperation implements IRunnableWithProgress {
 
 			if (!packages.isEmpty()) {
 				// transform to ExportPackageDescriptions
-				Set exportDescriptions = new HashSet(packages.size());
+				Map exportDescriptions = new HashMap(packages.size());
 
 				// remove system packages if they happen to be included. Adding a system package won't resolve anything, since package package already comes from JRE
 				ExportPackageDescription[] systemPackages = PDECore.getDefault().getModelManager().getState().getState().getSystemPackages();
@@ -220,7 +220,7 @@ public class FindClassResolutionsOperation implements IRunnableWithProgress {
 				ExportPackageDescription[] knownPackages = PDECore.getDefault().getModelManager().getState().getState().getExportedPackages();
 				for (int i = 0; i < knownPackages.length; i++) {
 					if (packages.containsKey(knownPackages[i].getName())) {
-						exportDescriptions.add(knownPackages[i]);
+						exportDescriptions.put(knownPackages[i].getName(), knownPackages[i]);
 					}
 				}
 				if (exportDescriptions.isEmpty()) {
@@ -228,7 +228,7 @@ public class FindClassResolutionsOperation implements IRunnableWithProgress {
 					packagesToExport.addAll(packages.values());
 				}
 
-				return exportDescriptions;
+				return exportDescriptions.values();
 			}
 
 			return Collections.EMPTY_SET;
@@ -247,22 +247,22 @@ public class FindClassResolutionsOperation implements IRunnableWithProgress {
 		return false;
 	}
 
-	private static Set getValidPackages(String pkgName) {
+	private static Collection getValidPackages(String pkgName) {
 		ExportPackageDescription[] knownPackages = PDECore.getDefault().getModelManager().getState().getState().getExportedPackages();
-		Set validPackages = new HashSet();
+		Map validPackages = new HashMap();
 		for (int i = 0; i < knownPackages.length; i++) {
 			if (knownPackages[i].getName().equals(pkgName)) {
-				validPackages.add(knownPackages[i]);
+				validPackages.put(knownPackages[i].getName(), knownPackages[i]);
 			}
 		}
 		// remove system packages if they happen to be included. Adding a system package won't resolve anything, since package package already comes from JRE
 		if (!validPackages.isEmpty()) {
 			knownPackages = PDECore.getDefault().getModelManager().getState().getState().getSystemPackages();
 			for (int i = 0; i < knownPackages.length; i++) {
-				validPackages.remove(knownPackages[i]);
+				validPackages.remove(knownPackages[i].getName());
 			}
 		}
-		return validPackages;
+		return validPackages.values();
 	}
 
 	private Set getVisiblePackages() {
