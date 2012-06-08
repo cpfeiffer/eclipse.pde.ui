@@ -40,7 +40,8 @@ public class QuickFixProcessor implements IQuickFixProcessor {
 					handleAccessRestrictionProblem(context, locations[i], results);
 				case IProblem.ImportNotFound : // fall through
 				case IProblem.UndefinedName : // fall through
-				case IProblem.UndefinedType :
+				case IProblem.UndefinedType : // fall through
+				case IProblem.UnresolvedVariable :
 					handleImportNotFound(context, locations[i], results);
 
 			}
@@ -248,6 +249,7 @@ public class QuickFixProcessor implements IQuickFixProcessor {
 			case IProblem.UndefinedName : // fall through
 			case IProblem.ImportNotFound : // fall through
 			case IProblem.UndefinedType :
+			case IProblem.UnresolvedVariable :
 				IJavaElement parent = unit.getParent();
 				if (parent != null) {
 					IJavaProject project = parent.getJavaProject();
