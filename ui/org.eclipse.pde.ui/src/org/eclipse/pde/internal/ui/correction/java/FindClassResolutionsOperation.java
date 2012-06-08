@@ -131,7 +131,7 @@ public class FindClassResolutionsOperation implements IRunnableWithProgress {
 
 		Collection validPackages = null;
 		ImportPackageSpecification[] importPkgs = null;
-		IPluginModelBase model = PluginRegistry.findModel(fProject.getProject());
+		IPluginModelBase model = PluginRegistry.findModel(fProject);
 		if (model != null && model.getBundleDescription() != null) {
 			importPkgs = model.getBundleDescription().getImportPackages();
 		}
@@ -169,20 +169,22 @@ public class FindClassResolutionsOperation implements IRunnableWithProgress {
 		SubMonitor subMonitor = SubMonitor.convert(monitor);
 
 		IPluginModelBase[] activeModels = PluginRegistry.getActiveModels();
-		Set projects = new HashSet(activeModels.length * 2);
+		Set javaProjects = new HashSet(activeModels.length * 2);
 
 		for (int i = 0; i < activeModels.length; i++) {
 			IResource resource = activeModels[i].getUnderlyingResource();
 			if (resource != null && resource.isAccessible()) {
 				IJavaProject javaProject = JavaCore.create(resource.getProject());
 				if (javaProject.exists()) {
-					projects.add(javaProject);
+					javaProjects.add(javaProject);
 				}
 			}
 		}
+		final IJavaProject currentJavaProject = JavaCore.create(fProject);
+		javaProjects.remove(currentJavaProject); // no need to search in current project itself
 
 		try {
-			IJavaSearchScope searchScope = SearchEngine.createJavaSearchScope((IJavaElement[]) projects.toArray(new IJavaElement[projects.size()]));
+			IJavaSearchScope searchScope = SearchEngine.createJavaSearchScope((IJavaElement[]) javaProjects.toArray(new IJavaElement[javaProjects.size()]));
 
 			final Map packages = new HashMap();
 			SearchRequestor requestor = new SearchRequestor() {
@@ -191,15 +193,17 @@ public class FindClassResolutionsOperation implements IRunnableWithProgress {
 					Object element = aMatch.getElement();
 					if (element instanceof IType) {
 						IType type = (IType) element;
-						IPackageFragment packageFragment = type.getPackageFragment();
-						if (packageFragment.exists()) {
-							packages.put(packageFragment.getElementName(), packageFragment);
+						if (!currentJavaProject.equals(type.getJavaProject())) {
+							IPackageFragment packageFragment = type.getPackageFragment();
+							if (packageFragment.exists()) {
+								packages.put(packageFragment.getElementName(), packageFragment);
+							}
 						}
 					}
 				}
 			};
 
-			SearchPattern typePattern = SearchPattern.createPattern(aTypeName, IJavaSearchConstants.TYPE, IJavaSearchConstants.DECLARATIONS, SearchPattern.R_EXACT_MATCH);
+			SearchPattern typePattern = SearchPattern.createPattern(aTypeName, IJavaSearchConstants.TYPE, IJavaSearchConstants.DECLARATIONS, SearchPattern.R_EXACT_MATCH | SearchPattern.R_CASE_SENSITIVE);
 			new SearchEngine().search(typePattern, new SearchParticipant[] {SearchEngine.getDefaultSearchParticipant()}, searchScope, requestor, subMonitor.newChild(1));
 
 			if (!packages.isEmpty()) {
