@@ -109,7 +109,8 @@ public class FindClassResolutionsOperation implements IRunnableWithProgress {
 				return;
 			}
 
-			while (validPackagesIter.hasNext() && !fCollector.isDone()) {
+			boolean allowMultipleFixes = packageName == null;
+			while (validPackagesIter.hasNext() && (allowMultipleFixes || !fCollector.isDone())) {
 				// since getting visible packages is not very efficient, only do it once and cache result
 				if (visiblePkgs == null) {
 					visiblePkgs = getVisiblePackages();
