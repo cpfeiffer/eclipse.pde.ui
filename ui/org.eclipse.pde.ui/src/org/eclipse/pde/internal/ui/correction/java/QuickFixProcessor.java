@@ -59,6 +59,16 @@ public class QuickFixProcessor implements IQuickFixProcessor {
 			referencedElement = ((Type) node).resolveBinding();
 		} else if (node instanceof Name) {
 			referencedElement = ((Name) node).resolveBinding();
+		} else if (node instanceof MethodInvocation) {
+			IMethodBinding tempMethod = ((MethodInvocation) node).resolveMethodBinding();
+			if (tempMethod != null) {
+				referencedElement = tempMethod.getDeclaringClass();
+			}
+		} else if (node instanceof FieldAccess) {
+			IVariableBinding tempVariable = ((FieldAccess) node).resolveFieldBinding();
+			if (tempVariable != null) {
+				referencedElement = tempVariable.getDeclaringClass();
+			}
 		}
 		if (referencedElement != null) {
 			// get the project that contains the reference element
@@ -142,7 +152,24 @@ public class QuickFixProcessor implements IQuickFixProcessor {
 				}
 			}
 			if (!supplierImported) {
-				Object proposal = JavaResolutionFactory.createRequireBundleProposal(currentProject, desc, JavaResolutionFactory.TYPE_JAVA_COMPLETION, 16);
+				// add import-package, if possible
+				boolean proposeRequireBundle = false;
+
+				ImportPackageSpecification[] importPackages = bd.getImportPackages();
+				for (int i = 0; i < importPackages.length; i++) {
+					if (desc.getName().equals(importPackages[i].getName())) {
+						// already imported, try require-bundle
+						proposeRequireBundle = true;
+						break;
+					}
+				}
+
+				Object proposal = null;
+				if (proposeRequireBundle) {
+					proposal = JavaResolutionFactory.createRequireBundleProposal(currentProject, desc, JavaResolutionFactory.TYPE_JAVA_COMPLETION, 16);
+				} else {
+					proposal = JavaResolutionFactory.createImportPackageProposal(currentProject, desc, JavaResolutionFactory.TYPE_JAVA_COMPLETION, 16);
+				}
 				if (proposal != null)
 					results.add(proposal);
 			}
